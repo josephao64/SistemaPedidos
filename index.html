@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mt-5">Iniciar Sesión</h1>
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-6">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="username">Usuario:</label>
+                        <select id="username" class="form-control">
+                            <option value="encargado_santa_elena">Encargado Santa Elena</option>
+                            <option value="encargado_jalapa">Encargado Jalapa</option>
+                            <option value="encargado_zacapa">Encargado Zacapa</option>
+                            <option value="encargado_eskala">Encargado Eskala</option>
+                            <option value="encargado_poptun">Encargado Poptún</option>
+                            <option value="administracion">Administración</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Iniciar Sesión</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('login-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            let url = '';
+            switch (username) {
+                case 'encargado_santa_elena':
+                    url = 'encargado.html?sucursal=santa_elena';
+                    break;
+                case 'encargado_jalapa':
+                    url = 'encargado.html?sucursal=jalapa';
+                    break;
+                case 'encargado_zacapa':
+                    url = 'encargado.html?sucursal=zacapa';
+                    break;
+                case 'encargado_eskala':
+                    url = 'encargado.html?sucursal=eskala';
+                    break;
+                case 'encargado_poptun':
+                    url = 'encargado.html?sucursal=poptun';
+                    break;
+                case 'administracion':
+                    url = 'administracion.html';
+                    break;
+            }
+            window.location.href = url;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encargado - Realizar Pedido</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="bg-dark text-white text-center py-3">
+        <h1 id="encargado-title">Realizar Pedido</h1>
+    </header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Encargado</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="showMenu('realizarPedido')">Realizar Pedido</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="showMenu('pedidosRealizados')">Pedidos Realizados</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <main class="container my-4">
+        <section id="realizarPedido">
+            <h2 class="mb-4">Nuevo Pedido</h2>
+            <form id="pedido-form" onsubmit="registrarPedido(event)" class="bg-light p-4 rounded">
+                <input type="hidden" id="sucursal">
+                <div class="form-group">
+                    <label for="proveedor">Seleccione el Proveedor:</label>
+                    <select id="proveedor" class="form-control" required>
+                        <option value="bodega">Bodega</option>
+                        <option value="serpesa">Serpesa</option>
+                        <option value="super_productos">Super Productos</option>
+                        <option value="calder">Calder</option>
+                        <option value="carnicos">Cárnicos</option>
+                        <option value="santa_lucia">Santa Lucia</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="fecha_pedido">Fecha del Pedido:</label>
+                    <input type="date" id="fecha_pedido" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Registrar Pedido</button>
+            </form>
+        </section>
+        <section id="productosPedido" class="hidden">
+            <h2 class="mb-4">Productos del Pedido</h2>
+            <form id="producto-form" onsubmit="agregarProducto(event)" class="bg-light p-4 rounded d-flex align-items-end">
+                <div class="form-group mr-2">
+                    <label for="producto">Producto:</label>
+                    <select id="producto" class="form-control" required></select>
+                </div>
+                <div class="form-group mr-2">
+                    <label for="presentacion">Presentación:</label>
+                    <input type="text" id="presentacion" class="form-control" readonly>
+                </div>
+                <div class="form-group mr-2">
+                    <label for="stock">Stock:</label>
+                    <input type="number" id="stock" class="form-control" required>
+                </div>
+                <div class="form-group mr-2">
+                    <label for="cantidad">Cantidad:</label>
+                    <input type="number" id="cantidad" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Agregar Producto</button>
+            </form>
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Presentación</th>
+                            <th>Stock</th>
+                            <th>Cantidad</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productos-list"></tbody>
+                </table>
+            </div>
+            <button class="btn btn-primary mt-4" onclick="enviarPedido()">Enviar Pedido</button>
+        </section>
+        <section id="pedidosRealizados" class="hidden">
+            <h2 class="mb-4">Pedidos Realizados</h2>
+            <div class="row">
+                <div class="col-md-6">
+                    <h3>Pedidos Confirmados</h3>
+                    <div id="pedidos-confirmados"></div>
+                </div>
+                <div class="col-md-6">
+                    <h3>Pedidos Pendientes</h3>
+                    <div id="pedidos-pendientes"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script type="module" src="script_encargado.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.13/jspdf.plugin.autotable.min.js"></script>
+</body>
+</html>
