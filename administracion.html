@@ -20,6 +20,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ml-auto">
                     <li class="nav-item"><a class="nav-link" href="#" onclick="showMenu('pedidos')">Pedidos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="showMenu('pedidosCompletados')">Pedidos Completados</a></li>
                 </ul>
             </div>
         </div>
@@ -27,7 +28,29 @@
     <main class="container my-4">
         <section id="pedidos">
             <h2 class="mb-4">Pedidos</h2>
-            <div id="pedidos-list"></div>
+            <div class="form-group">
+                <label for="filtro-sucursal">Filtrar por sucursal:</label>
+                <select id="filtro-sucursal" class="form-control" onchange="cargarPedidos()">
+                    <option value="general">General</option>
+                    <option value="santa_elena">Santa Elena</option>
+                    <option value="jalapa">Jalapa</option>
+                    <option value="zacapa">Zacapa</option>
+                    <option value="eskala">Eskala</option>
+                    <option value="poptun">Poptún</option>
+                </select>
+            </div>
+            <div id="pedidos-pendientes">
+                <h3>Pedidos Pendientes</h3>
+                <div id="pedidos-list-pendientes"></div>
+            </div>
+            <div id="pedidos-confirmados" class="mt-4">
+                <h3>Pedidos Confirmados</h3>
+                <div id="pedidos-list-confirmados"></div>
+            </div>
+        </section>
+        <section id="pedidosCompletados" class="hidden">
+            <h2 class="mb-4">Pedidos Completados</h2>
+            <div id="pedidos-list-completados"></div>
         </section>
     </main>
     <script type="module" src="script_administracion.js"></script>

@@ -21,20 +21,28 @@ document.addEventListener("DOMContentLoaded", function() {
             section.classList.add('hidden');
         });
         document.getElementById(menu).classList.remove('hidden');
-
-        if (menu === 'pedidosRealizados') {
-            cargarPedidosRealizados();
-        }
     }
 
     window.showMenu = showMenu;
 
-    async function cargarPedidosRealizados() {
-        const pedidosList = document.getElementById('pedidos-list');
-        pedidosList.innerHTML = '';
+    async function cargarPedidos() {
+        const filtroSucursal = document.getElementById('filtro-sucursal').value;
+        const pedidosPendientes = document.getElementById('pedidos-list-pendientes');
+        const pedidosConfirmados = document.getElementById('pedidos-list-confirmados');
+        const pedidosCompletados = document.getElementById('pedidos-list-completados');
+
+        pedidosPendientes.innerHTML = '';
+        pedidosConfirmados.innerHTML = '';
+        pedidosCompletados.innerHTML = '';
 
         try {
-            const q = query(collection(db, "pedidos"), where("estado", "in", ["pendiente_confirmacion", "confirmado"]));
+            let q;
+            if (filtroSucursal === 'general') {
+                q = query(collection(db, "pedidos"));
+            } else {
+                q = query(collection(db, "pedidos"), where("sucursal", "==", filtroSucursal));
+            }
+            
             const snapshot = await getDocs(q);
             snapshot.forEach(doc => {
                 const pedido = doc.data();
@@ -45,9 +53,10 @@ document.addEventListener("DOMContentLoaded", function() {
                         <h5 class="card-title">Pedido: ${pedido.sucursal} - ${pedido.proveedor} (${pedido.fecha})</h5>
                     </div>
                     <div class="card-body">
-                        <p class="card-text">Estado: ${pedido.estado === 'pendiente_confirmacion' ? 'Pendiente de Confirmación' : 'Confirmado'}</p>
-                        <button class="btn btn-primary" onclick="revisarPedidoRealizado('${doc.id}')">Revisar Pedido Realizado</button>
-                        ${pedido.estado === 'confirmado' ? '<button class="btn btn-secondary" onclick="revisarProductosRecibidos(\'' + doc.id + '\')">Revisar Productos Recibidos</button>' : ''}
+                        <p class="card-text">Estado: ${pedido.estado === 'pendiente_confirmacion' ? 'Pendiente de Confirmación' : pedido.estado === 'confirmado' ? 'Confirmado' : 'Completado'}</p>
+                        <button class="btn btn-primary" onclick="revisarPedidoRealizado('${doc.id}')">Revisar Pedido</button>
+                        <button class="btn btn-danger" onclick="eliminarPedido('${doc.id}')">Eliminar Pedido</button>
+                        <button class="btn btn-success" onclick="exportarPedidoPDF('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Exportar a PDF</button>
                     </div>
                     <div id="productos-${doc.id}" class="card-body hidden">
                         <table class="table table-bordered">
@@ -57,22 +66,29 @@ document.addEventListener("DOMContentLoaded", function() {
                                     <th>Presentación</th>
                                     <th>Cantidad</th>
                                     ${pedido.estado === 'confirmado' ? '<th>Cantidad Recibida</th><th>Comentarios</th>' : ''}
-                                    ${pedido.estado === 'pendiente_confirmacion' ? '<th>Acciones</th>' : ''}
+                                    <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="productos-list-${doc.id}"></tbody>
                         </table>
                         ${pedido.estado === 'pendiente_confirmacion' ? '<button class="btn btn-primary mt-2" onclick="confirmarPedido(\'' + doc.id + '\')">Confirmar Pedido</button>' : ''}
+                        ${pedido.estado === 'verificado' ? '<button class="btn btn-secondary mt-2" onclick="verificarProductoEntregado(\'' + doc.id + '\')">Revisar Productos Recibidos</button>' : ''}
                     </div>
                 `;
-                pedidosList.appendChild(pedidoElement);
+                if (pedido.estado === 'pendiente_confirmacion') {
+                    pedidosPendientes.appendChild(pedidoElement);
+                } else if (pedido.estado === 'confirmado') {
+                    pedidosConfirmados.appendChild(pedidoElement);
+                } else if (pedido.estado === 'completado') {
+                    pedidosCompletados.appendChild(pedidoElement);
+                }
             });
         } catch (error) {
-            console.error('Error al cargar pedidos realizados:', error);
+            console.error('Error al cargar pedidos:', error);
         }
     }
 
-    window.cargarPedidosRealizados = cargarPedidosRealizados;
+    window.cargarPedidos = cargarPedidos;
 
     async function revisarPedidoRealizado(docId) {
         const productosList = document.getElementById(`productos-list-${docId}`);
@@ -90,6 +106,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         <td>${producto.producto}</td>
                         <td>${producto.presentacion}</td>
                         <td><input type="number" value="${producto.cantidad}" onchange="actualizarCantidad('${docId}', '${producto.producto}', this.value)"></td>
+                        <td><button class="btn btn-warning" onclick="editarProducto('${docId}', ${index})">Editar</button></td>
                         <td><button class="btn btn-danger" onclick="eliminarProducto('${docId}', ${index})">Eliminar</button></td>
                     `;
                     productosList.appendChild(productoElement);
@@ -183,7 +200,7 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             await updateDoc(pedidoRef, { estado: 'confirmado' });
             alert('Pedido confirmado exitosamente.');
-            cargarPedidosRealizados(); // Actualizar la vista
+            cargarPedidos(); // Actualizar la vista
         } catch (error) {
             console.error('Error al confirmar pedido:', error);
         }
@@ -191,34 +208,58 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.confirmarPedido = confirmarPedido;
 
-    async function revisarProductosRecibidos(docId) {
-        const productosList = document.getElementById(`productos-list-${docId}`);
-        const productosDiv = document.getElementById(`productos-${docId}`);
-        productosDiv.classList.toggle('hidden');
+    async function verificarProductoEntregado(docId) {
+        const pedidoRef = firestoreDoc(db, "pedidos", docId);
 
-        if (!productosDiv.classList.contains('hidden')) {
+        try {
+            await updateDoc(pedidoRef, { estado: 'completado' });
+            alert('Producto verificado y pedido completado.');
+            cargarPedidos(); // Actualizar la vista
+        } catch (error) {
+            console.error('Error al verificar producto entregado:', error);
+        }
+    }
+
+    window.verificarProductoEntregado = verificarProductoEntregado;
+
+    async function eliminarPedido(docId) {
+        if (confirm("¿Está seguro de que desea eliminar este pedido?")) {
             try {
-                const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
-                const pedido = docSnap.data();
-                productosList.innerHTML = '';
-                pedido.productos.forEach(producto => {
-                    const productoElement = document.createElement('tr');
-                    productoElement.innerHTML = `
-                        <td>${producto.producto}</td>
-                        <td>${producto.presentacion}</td>
-                        <td>${producto.cantidad}</td>
-                        <td>${producto.cantidadRecibida || ''}</td>
-                        <td>${producto.comentarios || ''}</td>
-                    `;
-                    productosList.appendChild(productoElement);
-                });
+                await deleteDoc(firestoreDoc(db, "pedidos", docId));
+                document.getElementById(`pedido-${docId}`).remove();
+                alert("Pedido eliminado exitosamente.");
+                cargarPedidos();
             } catch (error) {
-                console.error('Error al revisar productos recibidos:', error);
+                console.error("Error al eliminar pedido:", error);
             }
         }
     }
 
-    window.revisarProductosRecibidos = revisarProductosRecibidos;
+    window.eliminarPedido = eliminarPedido;
 
-    cargarPedidosRealizados();
+    async function exportarPedidoPDF(docId, sucursal, fecha, proveedor) {
+        const { jsPDF } = window.jspdf;
+        const pdfDoc = new jsPDF();
+
+        try {
+            const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
+            const pedido = docSnap.data();
+            let y = 10;
+            pdfDoc.text(`PEDIDO ${pedido.nombre.toUpperCase()}`, 10, y);
+            pdfDoc.text(`Fecha: ${pedido.fecha}`, 10, y + 10);
+            y += 20;
+            pdfDoc.autoTable({
+                startY: y,
+                head: [['PRODUCTO', 'PRESENTACIÓN', 'CANTIDAD']],
+                body: pedido.productos.map(p => [p.producto, p.presentacion, p.cantidad]),
+            });
+            pdfDoc.save(`pedido_${pedido.nombre.replace(/\s/g, '_')}.pdf`);
+        } catch (error) {
+            console.error('Error al exportar pedido a PDF:', error);
+        }
+    }
+
+    window.exportarPedidoPDF = exportarPedidoPDF;
+
+    cargarPedidos();
 });

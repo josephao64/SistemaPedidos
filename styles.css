@@ -21,6 +21,7 @@ nav {
 nav ul {
     list-style: none;
     padding: 0;
+    text-align: center;
 }
 
 nav ul li {
@@ -158,5 +159,43 @@ form button:hover {
 
     .card-header, .card-body {
         padding: 15px;
+    }
+
+    form {
+        padding: 1em;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    th, td {
+        padding: 8px;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .d-flex {
+        flex-direction: column;
+    }
+
+    .form-group {
+        width: 100%;
+        margin-bottom: 1em;
+    }
+
+    .form-group label {
+        margin-bottom: 0.5em;
+    }
+
+    .form-group input, .form-group select {
+        width: 100%;
     }
 }

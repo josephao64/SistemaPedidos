@@ -33,28 +33,28 @@ document.getElementById('encargado-title').innerText += ` - ${sucursal.charAt(0)
 
 const productsByBranch = {
     bodega: [
-        { name: "Harina Trigo Saco 50 lbs", unit: "SACO 50 LIBRAS", stock: 100, category: "Harina" },
-        { name: "Limpia Vidrios", unit: "UNIDAD", stock: 200, category: "Productos de Limpieza" },
-        { name: "Detergente", unit: "UNIDAD", stock: 300, category: "Productos de Limpieza" },
+        { name: "Harina Trigo Saco 50 lbs", unit: "SACO 50 LIBRAS", category: "Harina" },
+        { name: "Limpia Vidrios", unit: "UNIDAD", category: "Productos de Limpieza" },
+        { name: "Detergente", unit: "UNIDAD", category: "Productos de Limpieza" },
     ],
     serpesa: [
-        { name: "Salami Bolsa", unit: "BOLSA", stock: 150, category: "Carnes" },
+        { name: "Salami Bolsa", unit: "BOLSA", category: "Carnes" },
     ],
     super_productos: [
-        { name: "Tomato Pasta", unit: "UNIDAD", stock: 250, category: "Salsas y Condimentos" },
-        { name: "Champiñones", unit: "UNIDAD", stock: 50, category: "Vegetales y Frutas" },
+        { name: "Tomato Pasta", unit: "UNIDAD", category: "Salsas y Condimentos" },
+        { name: "Champiñones", unit: "UNIDAD", category: "Vegetales y Frutas" },
     ],
     calder: [
-        { name: "Pizza Cheese Rallado 20 lbs", unit: "LIBRA", stock: 120, category: "Quesos" },
-        { name: "Pizza Cheese Block 5 lbs", unit: "LIBRA", stock: 80, category: "Quesos" },
+        { name: "Pizza Cheese Rallado 20 lbs", unit: "LIBRA", category: "Quesos" },
+        { name: "Pizza Cheese Block 5 lbs", unit: "LIBRA", category: "Quesos" },
     ],
     carnicos: [
-        { name: "Jamón Tipo Pizza Granel", unit: "LIBRA", stock: 60, category: "Carnes" },
-        { name: "Tocino Rebanado Ahumado", unit: "LIBRA", stock: 40, category: "Carnes" },
+        { name: "Jamón Tipo Pizza Granel", unit: "LIBRA", category: "Carnes" },
+        { name: "Tocino Rebanado Ahumado", unit: "LIBRA", category: "Carnes" },
     ],
     santa_lucia: [
-        { name: "Topping Res de Vacio 5x1", unit: "UNIDAD", stock: 30, category: "Carnes" },
-        { name: "Roastbest", unit: "UNIDAD", stock: 20, category: "Carnes" },
+        { name: "Topping Res de Vacio 5x1", unit: "UNIDAD", category: "Carnes" },
+        { name: "Roastbest", unit: "UNIDAD", category: "Carnes" },
     ]
 };
 
@@ -104,7 +104,6 @@ document.addEventListener("DOMContentLoaded", function() {
             option.value = producto.name;
             option.textContent = producto.name;
             option.dataset.unit = producto.unit;
-            option.dataset.stock = producto.stock;
             productoSelect.appendChild(option);
         });
 
@@ -112,7 +111,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const selectedProduct = productos.find(p => p.name === this.value);
             if (selectedProduct) {
                 document.getElementById('presentacion').value = selectedProduct.unit;
-                document.getElementById('stock').value = selectedProduct.stock;
+                document.getElementById('stock').value = ''; // Clear stock value
             }
         });
     }
@@ -205,10 +204,10 @@ document.addEventListener("DOMContentLoaded", function() {
                     <div class="card-body">
                         <p class="card-text">Estado: ${pedido.estado === 'pendiente_confirmacion' ? 'Pendiente de Confirmación' : 'Confirmado'}</p>
                         <button class="btn btn-primary" onclick="mostrarProductos('${doc.id}')">Mostrar Pedido</button>
-                        <button class="btn btn-success" onclick="descargarPedido('${doc.id}')">Descargar Pedido</button>
+                        <button class="btn btn-success" onclick="descargarPedido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido</button>
                         ${pedido.estado === 'confirmado' ? `
                             <button class="btn btn-secondary" onclick="revisarProductosRecibidos('${doc.id}')">Revisar Productos Recibidos</button>
-                            <button class="btn btn-success" onclick="descargarPedidoRecibido('${doc.id}')">Descargar Pedido Recibido</button>
+                            <button class="btn btn-success" onclick="descargarPedidoRecibido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido Recibido</button>
                         ` : ''}
                     </div>
                     <div id="productos-${doc.id}" class="card-body hidden">
@@ -331,8 +330,9 @@ document.addEventListener("DOMContentLoaded", function() {
                     comentarios: p.comentarios || ''
                 };
             });
-            await updateDoc(pedidoRef, { productos });
+            await updateDoc(pedidoRef, { productos, estado: 'verificado' });
             alert('Datos recibidos guardados exitosamente.');
+            cargarPedidosRealizados(); // Refresh the list
         } catch (error) {
             console.error('Error al guardar datos recibidos:', error);
         }
@@ -340,13 +340,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.guardarDatosRecibidos = guardarDatosRecibidos;
 
-    function descargarPedido(docId) {
+    function descargarPedido(docId, sucursal, fecha, proveedor) {
         const pedidoRef = firestoreDoc(db, "pedidos", docId);
 
         getDoc(pedidoRef).then(docSnap => {
             const pedido = docSnap.data();
-            const csvContent = convertToCSV(pedido.productos, false);
-            downloadCSV(csvContent, `pedido_${docId}.csv`);
+            const doc = convertToPDF(pedido.productos, false, sucursal, fecha, proveedor);
+            doc.save(`pedido_${docId}.pdf`);
         }).catch(error => {
             console.error('Error al descargar pedido:', error);
         });
@@ -354,13 +354,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.descargarPedido = descargarPedido;
 
-    function descargarPedidoRecibido(docId) {
+    function descargarPedidoRecibido(docId, sucursal, fecha, proveedor) {
         const pedidoRef = firestoreDoc(db, "pedidos", docId);
 
         getDoc(pedidoRef).then(docSnap => {
             const pedido = docSnap.data();
-            const csvContent = convertToCSV(pedido.productos, true);
-            downloadCSV(csvContent, `pedido_recibido_${docId}.csv`);
+            const doc = convertToPDF(pedido.productos, true, sucursal, fecha, proveedor);
+            doc.save(`pedido_recibido_${docId}.pdf`);
         }).catch(error => {
             console.error('Error al descargar pedido recibido:', error);
         });
@@ -368,28 +368,36 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.descargarPedidoRecibido = descargarPedidoRecibido;
 
-    function convertToCSV(productos, includeReceived) {
+    function convertToPDF(productos, includeReceived, sucursal, fecha, proveedor) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
         const headers = ['Producto', 'Presentación', 'Cantidad'];
         if (includeReceived) {
             headers.push('Cantidad Recibida', 'Comentarios');
         }
-        const csvRows = [headers.join(',')];
-        productos.forEach(p => {
-            const row = [p.producto, p.presentacion, p.cantidad];
-            if (includeReceived) {
-                row.push(p.cantidadRecibida || '', p.comentarios || '');
-            }
-            csvRows.push(row.join(','));
-        });
-        return csvRows.join('\n');
-    }
 
-    function downloadCSV(csvContent, filename) {
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = filename;
-        link.click();
+        const rows = productos.map(producto => {
+            const row = [producto.producto, producto.presentacion, producto.cantidad];
+            if (includeReceived) {
+                row.push(producto.cantidadRecibida || 'N/A', producto.comentarios || 'Ninguno');
+            }
+            return row;
+        });
+
+        doc.setFontSize(16);
+        doc.text('Reporte de Pedido', 14, 16);
+        doc.setFontSize(12);
+        doc.text(`Sucursal: ${sucursal}`, 14, 26);
+        doc.text(`Fecha: ${fecha}`, 14, 32);
+        doc.text(`Proveedor: ${proveedor}`, 14, 38);
+
+        doc.autoTable({
+            startY: 45,
+            head: [headers],
+            body: rows
+        });
+
+        return doc;
     }
 
     cargarPedidosRealizados();
