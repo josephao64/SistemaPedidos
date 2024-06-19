@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc as firestoreDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, where, updateDoc, doc as firestoreDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -175,7 +175,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 estado: 'pendiente_confirmacion'
             });
             alert('Pedido enviado exitosamente.');
-            location.reload(); // Recargar la página
+            showMenu('realizarPedido');
         } catch (error) {
             console.error('Error al enviar pedido:', error);
         }
@@ -189,9 +189,12 @@ document.addEventListener("DOMContentLoaded", function() {
         pedidosConfirmados.innerHTML = '';
         pedidosPendientes.innerHTML = '';
 
-        try {
-            const q = query(collection(db, "pedidos"), where("sucursal", "==", sucursal));
-            const snapshot = await getDocs(q);
+        const q = query(collection(db, "pedidos"), where("sucursal", "==", sucursal));
+
+        onSnapshot(q, (snapshot) => {
+            pedidosConfirmados.innerHTML = '';
+            pedidosPendientes.innerHTML = '';
+
             snapshot.forEach(doc => {
                 const pedido = doc.data();
                 const pedidoElement = document.createElement('div');
@@ -233,9 +236,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     pedidosConfirmados.appendChild(pedidoElement);
                 }
             });
-        } catch (error) {
-            console.error('Error al cargar pedidos realizados:', error);
-        }
+        });
     }
 
     window.cargarPedidosRealizados = cargarPedidosRealizados;
@@ -351,7 +352,7 @@ document.addEventListener("DOMContentLoaded", function() {
             });
             await updateDoc(pedidoRef, { productos, estado: 'verificado' });
             alert('Datos recibidos guardados exitosamente.');
-            location.reload(); // Recargar la página
+            cargarPedidosRealizados(); // Refresh the list
         } catch (error) {
             console.error('Error al guardar datos recibidos:', error);
         }

@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, updateDoc, doc as firestoreDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, updateDoc, doc as firestoreDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -35,15 +35,18 @@ document.addEventListener("DOMContentLoaded", function() {
         pedidosConfirmados.innerHTML = '';
         pedidosCompletados.innerHTML = '';
 
-        try {
-            let q;
-            if (filtroSucursal === 'general') {
-                q = query(collection(db, "pedidos"));
-            } else {
-                q = query(collection(db, "pedidos"), where("sucursal", "==", filtroSucursal));
-            }
-            
-            const snapshot = await getDocs(q);
+        let q;
+        if (filtroSucursal === 'general') {
+            q = collection(db, "pedidos");
+        } else {
+            q = collection(db, "pedidos").where("sucursal", "==", filtroSucursal);
+        }
+
+        onSnapshot(q, (snapshot) => {
+            pedidosPendientes.innerHTML = '';
+            pedidosConfirmados.innerHTML = '';
+            pedidosCompletados.innerHTML = '';
+
             snapshot.forEach(doc => {
                 const pedido = doc.data();
                 const pedidoElement = document.createElement('div');
@@ -57,6 +60,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         <button class="btn btn-primary" onclick="mostrarProductosConfirmados('${doc.id}')">Mostrar Pedido</button>
                         <button class="btn btn-danger" onclick="eliminarPedido('${doc.id}')">Eliminar Pedido</button>
                         <button class="btn btn-success" onclick="exportarPedidoPDF('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Exportar a PDF</button>
+                        ${pedido.estado === 'pendiente_confirmacion' ? '<button class="btn btn-primary mt-2" onclick="confirmarPedido(\'' + doc.id + '\')">Confirmar Pedido</button>' : ''}
                         ${pedido.estado === 'confirmado' ? '<button class="btn btn-secondary mt-2" onclick="comprobarPedidoRecibidoAdmin(\'' + doc.id + '\')">Comprobar Pedido Recibido</button>' : ''}
                         ${pedido.estado === 'verificado' ? '<button class="btn btn-secondary mt-2" onclick="comprobarPedidoRecibidoAdmin(\'' + doc.id + '\')">Verificar Pedido Recibido</button><button class="btn btn-success mt-2" onclick="descargarPedidoRecibido(\'' + doc.id + '\')">Descargar Pedido Recibido</button>' : ''}
                         ${pedido.estado !== 'completado' ? '<button class="btn btn-secondary mt-2" onclick="marcarPedidoCompletado(\'' + doc.id + '\')">Marcar como Completado</button>' : ''}
@@ -85,9 +89,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     pedidosCompletados.appendChild(pedidoElement);
                 }
             });
-        } catch (error) {
-            console.error('Error al cargar pedidos:', error);
-        }
+        });
     }
 
     window.cargarPedidos = cargarPedidos;
@@ -102,12 +104,12 @@ document.addEventListener("DOMContentLoaded", function() {
                 const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
                 const pedido = docSnap.data();
                 productosList.innerHTML = '';
-                pedido.productos.forEach(producto => {
+                pedido.productos.forEach((producto, index) => {
                     const productoElement = document.createElement('tr');
                     productoElement.innerHTML = `
                         <td>${producto.producto}</td>
                         <td>${producto.presentacion}</td>
-                        <td>${producto.cantidad}</td>
+                        <td><input type="number" value="${producto.cantidad}" onchange="actualizarCantidad('${docId}', '${index}', this.value)"></td>
                         <td>${producto.cantidadRecibida || ''}</td>
                         <td>${producto.comentarios || ''}</td>
                     `;
@@ -121,13 +123,32 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.mostrarProductosConfirmados = mostrarProductosConfirmados;
 
+    async function actualizarCantidad(docId, index, cantidad) {
+        const pedidoRef = firestoreDoc(db, "pedidos", docId);
+
+        try {
+            const docSnap = await getDoc(pedidoRef);
+            const pedido = docSnap.data();
+            const productos = pedido.productos.map((p, i) => {
+                if (i === index) {
+                    p.cantidad = cantidad;
+                }
+                return p;
+            });
+            await updateDoc(pedidoRef, { productos });
+        } catch (error) {
+            console.error('Error al actualizar cantidad:', error);
+        }
+    }
+
+    window.actualizarCantidad = actualizarCantidad;
+
     async function confirmarPedido(docId) {
         const pedidoRef = firestoreDoc(db, "pedidos", docId);
 
         try {
             await updateDoc(pedidoRef, { estado: 'confirmado' });
             alert('Pedido confirmado exitosamente.');
-            location.reload(); // Recargar la página
         } catch (error) {
             console.error('Error al confirmar pedido:', error);
         }
@@ -141,7 +162,6 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             await updateDoc(pedidoRef, { estado: 'completado' });
             alert('Producto verificado y pedido completado.');
-            location.reload(); // Recargar la página
         } catch (error) {
             console.error('Error al verificar producto entregado:', error);
         }
@@ -154,7 +174,6 @@ document.addEventListener("DOMContentLoaded", function() {
             try {
                 await deleteDoc(firestoreDoc(db, "pedidos", docId));
                 alert("Pedido eliminado exitosamente.");
-                location.reload(); // Recargar la página
             } catch (error) {
                 console.error("Error al eliminar pedido:", error);
             }
@@ -222,7 +241,6 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             await updateDoc(pedidoRef, { estado: 'completado' });
             alert('Pedido marcado como completado.');
-            location.reload(); // Recargar la página
         } catch (error) {
             console.error('Error al marcar pedido como completado:', error);
         }
