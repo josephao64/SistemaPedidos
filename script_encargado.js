@@ -206,8 +206,8 @@ document.addEventListener("DOMContentLoaded", function() {
                         <button class="btn btn-primary" onclick="mostrarProductos('${doc.id}')">Mostrar Pedido</button>
                         <button class="btn btn-success" onclick="descargarPedido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido</button>
                         ${pedido.estado === 'confirmado' ? `
-                            <button class="btn btn-secondary" onclick="revisarProductosRecibidos('${doc.id}')">Revisar Productos Recibidos</button>
-                            <button class="btn btn-success" onclick="descargarPedidoRecibido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido Recibido</button>
+                            <button class="btn btn-secondary" onclick="comprobarPedidoRecibido('${doc.id}')">Comprobar Pedido Recibido</button>
+                            <button class="btn btn-success" id="descargar-recibido-${doc.id}" onclick="descargarPedidoRecibido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido Recibido</button>
                         ` : ''}
                     </div>
                     <div id="productos-${doc.id}" class="card-body hidden">
@@ -218,7 +218,8 @@ document.addEventListener("DOMContentLoaded", function() {
                                         <th>Producto</th>
                                         <th>Presentación</th>
                                         <th>Cantidad</th>
-                                        ${pedido.estado === 'confirmado' ? '<th>Cantidad Recibida</th><th>Comentarios</th><th>Acciones</th>' : ''}
+                                        <th>Cantidad Recibida</th>
+                                        <th>Comentarios</th>
                                     </tr>
                                 </thead>
                                 <tbody id="productos-list-${doc.id}"></tbody>
@@ -256,10 +257,6 @@ document.addEventListener("DOMContentLoaded", function() {
                         <td>${producto.producto}</td>
                         <td>${producto.presentacion}</td>
                         <td>${producto.cantidad}</td>
-                        ${pedido.estado === 'confirmado' ? `
-                            <td><input type="number" value="${producto.cantidadRecibida || ''}" onchange="actualizarCantidadRecibida('${docId}', '${producto.producto}', this.value)"></td>
-                            <td><input type="text" value="${producto.comentarios || ''}" onchange="actualizarComentarios('${docId}', '${producto.producto}', this.value)"></td>
-                        ` : ''}
                     `;
                     productosList.appendChild(productoElement);
                 });
@@ -270,6 +267,35 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     window.mostrarProductos = mostrarProductos;
+
+    async function comprobarPedidoRecibido(docId) {
+        const productosList = document.getElementById(`productos-list-${docId}`);
+        const productosDiv = document.getElementById(`productos-${docId}`);
+        productosDiv.classList.toggle('hidden');
+
+        if (!productosDiv.classList.contains('hidden')) {
+            try {
+                const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
+                const pedido = docSnap.data();
+                productosList.innerHTML = '';
+                pedido.productos.forEach(producto => {
+                    const productoElement = document.createElement('tr');
+                    productoElement.innerHTML = `
+                        <td>${producto.producto}</td>
+                        <td>${producto.presentacion}</td>
+                        <td>${producto.cantidad}</td>
+                        <td><input type="number" value="${producto.cantidadRecibida || ''}" onchange="actualizarCantidadRecibida('${docId}', '${producto.producto}', this.value)"></td>
+                        <td><input type="text" value="${producto.comentarios || ''}" onchange="actualizarComentarios('${docId}', '${producto.producto}', this.value)"></td>
+                    `;
+                    productosList.appendChild(productoElement);
+                });
+            } catch (error) {
+                console.error('Error al comprobar pedido recibido:', error);
+            }
+        }
+    }
+
+    window.comprobarPedidoRecibido = comprobarPedidoRecibido;
 
     async function actualizarCantidadRecibida(docId, producto, cantidadRecibida) {
         const pedidoRef = firestoreDoc(db, "pedidos", docId);
@@ -311,12 +337,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.actualizarComentarios = actualizarComentarios;
 
-    async function revisarProductosRecibidos(docId) {
-        mostrarProductos(docId);
-    }
-
-    window.revisarProductosRecibidos = revisarProductosRecibidos;
-
     async function guardarDatosRecibidos(docId) {
         const pedidoRef = firestoreDoc(db, "pedidos", docId);
 
@@ -333,6 +353,7 @@ document.addEventListener("DOMContentLoaded", function() {
             await updateDoc(pedidoRef, { productos, estado: 'verificado' });
             alert('Datos recibidos guardados exitosamente.');
             cargarPedidosRealizados(); // Refresh the list
+            document.getElementById(`descargar-recibido-${docId}`).style.display = 'inline-block';
         } catch (error) {
             console.error('Error al guardar datos recibidos:', error);
         }

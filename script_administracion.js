@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, arrayUnion, doc as firestoreDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, updateDoc, doc as firestoreDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -54,9 +54,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     </div>
                     <div class="card-body">
                         <p class="card-text">Estado: ${pedido.estado === 'pendiente_confirmacion' ? 'Pendiente de Confirmación' : pedido.estado === 'confirmado' ? 'Confirmado' : 'Completado'}</p>
-                        <button class="btn btn-primary" onclick="revisarPedidoRealizado('${doc.id}')">Revisar Pedido</button>
+                        <button class="btn btn-primary" onclick="mostrarProductosConfirmados('${doc.id}')">Mostrar Pedido</button>
                         <button class="btn btn-danger" onclick="eliminarPedido('${doc.id}')">Eliminar Pedido</button>
                         <button class="btn btn-success" onclick="exportarPedidoPDF('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Exportar a PDF</button>
+                        ${pedido.estado === 'confirmado' ? '<button class="btn btn-secondary mt-2" onclick="comprobarPedidoRecibidoAdmin(\'' + doc.id + '\')">Comprobar Pedido Recibido</button>' : ''}
+                        ${pedido.estado === 'verificado' ? '<button class="btn btn-secondary mt-2" onclick="comprobarPedidoRecibidoAdmin(\'' + doc.id + '\')">Verificar Pedido Recibido</button><button class="btn btn-success mt-2" onclick="descargarPedidoRecibido(\'' + doc.id + '\')">Descargar Pedido Recibido</button>' : ''}
+                        ${pedido.estado !== 'completado' ? '<button class="btn btn-secondary mt-2" onclick="marcarPedidoCompletado(\'' + doc.id + '\')">Marcar como Completado</button>' : ''}
                     </div>
                     <div id="productos-${doc.id}" class="card-body hidden">
                         <table class="table table-bordered">
@@ -65,21 +68,20 @@ document.addEventListener("DOMContentLoaded", function() {
                                     <th>Producto</th>
                                     <th>Presentación</th>
                                     <th>Cantidad</th>
-                                    ${pedido.estado === 'confirmado' ? '<th>Cantidad Recibida</th><th>Comentarios</th>' : ''}
-                                    <th>Acciones</th>
+                                    <th>Cantidad Recibida</th>
+                                    <th>Comentarios</th>
                                 </tr>
                             </thead>
                             <tbody id="productos-list-${doc.id}"></tbody>
                         </table>
                         ${pedido.estado === 'pendiente_confirmacion' ? '<button class="btn btn-primary mt-2" onclick="confirmarPedido(\'' + doc.id + '\')">Confirmar Pedido</button>' : ''}
-                        ${pedido.estado === 'verificado' ? '<button class="btn btn-secondary mt-2" onclick="verificarProductoEntregado(\'' + doc.id + '\')">Revisar Productos Recibidos</button>' : ''}
                     </div>
                 `;
                 if (pedido.estado === 'pendiente_confirmacion') {
                     pedidosPendientes.appendChild(pedidoElement);
                 } else if (pedido.estado === 'confirmado') {
                     pedidosConfirmados.appendChild(pedidoElement);
-                } else if (pedido.estado === 'completado') {
+                } else if (pedido.estado === 'completado' || pedido.estado === 'verificado') {
                     pedidosCompletados.appendChild(pedidoElement);
                 }
             });
@@ -90,7 +92,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.cargarPedidos = cargarPedidos;
 
-    async function revisarPedidoRealizado(docId) {
+    async function mostrarProductosConfirmados(docId) {
         const productosList = document.getElementById(`productos-list-${docId}`);
         const productosDiv = document.getElementById(`productos-${docId}`);
         productosDiv.classList.toggle('hidden');
@@ -100,99 +102,24 @@ document.addEventListener("DOMContentLoaded", function() {
                 const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
                 const pedido = docSnap.data();
                 productosList.innerHTML = '';
-                pedido.productos.forEach((producto, index) => {
+                pedido.productos.forEach(producto => {
                     const productoElement = document.createElement('tr');
                     productoElement.innerHTML = `
                         <td>${producto.producto}</td>
                         <td>${producto.presentacion}</td>
-                        <td><input type="number" value="${producto.cantidad}" onchange="actualizarCantidad('${docId}', '${producto.producto}', this.value)"></td>
-                        <td><button class="btn btn-warning" onclick="editarProducto('${docId}', ${index})">Editar</button></td>
-                        <td><button class="btn btn-danger" onclick="eliminarProducto('${docId}', ${index})">Eliminar</button></td>
+                        <td>${producto.cantidad}</td>
+                        <td>${producto.cantidadRecibida || ''}</td>
+                        <td>${producto.comentarios || ''}</td>
                     `;
                     productosList.appendChild(productoElement);
                 });
-                const addProductForm = document.createElement('form');
-                addProductForm.innerHTML = `
-                    <tr>
-                        <td><input type="text" id="nuevo-producto-${docId}" class="form-control"></td>
-                        <td><input type="text" id="nueva-presentacion-${docId}" class="form-control"></td>
-                        <td><input type="number" id="nueva-cantidad-${docId}" class="form-control"></td>
-                        <td><button class="btn btn-primary" onclick="agregarProducto('${docId}')">Agregar Producto</button></td>
-                    </tr>
-                `;
-                productosList.appendChild(addProductForm);
             } catch (error) {
-                console.error('Error al revisar pedido realizado:', error);
+                console.error('Error al mostrar productos confirmados:', error);
             }
         }
     }
 
-    window.revisarPedidoRealizado = revisarPedidoRealizado;
-
-    async function actualizarCantidad(docId, producto, cantidad) {
-        const pedidoRef = firestoreDoc(db, "pedidos", docId);
-
-        try {
-            const docSnap = await getDoc(pedidoRef);
-            const pedido = docSnap.data();
-            const productos = pedido.productos.map(p => {
-                if (p.producto === producto) {
-                    p.cantidad = cantidad;
-                }
-                return p;
-            });
-            await updateDoc(pedidoRef, { productos });
-            alert('Cantidad actualizada.');
-        } catch (error) {
-            console.error('Error al actualizar cantidad:', error);
-        }
-    }
-
-    window.actualizarCantidad = actualizarCantidad;
-
-    async function eliminarProducto(docId, index) {
-        const pedidoRef = firestoreDoc(db, "pedidos", docId);
-
-        try {
-            const docSnap = await getDoc(pedidoRef);
-            const pedido = docSnap.data();
-            const productos = pedido.productos;
-            productos.splice(index, 1); // Eliminar el producto en la posición indicada
-            await updateDoc(pedidoRef, { productos });
-            revisarPedidoRealizado(docId); // Actualizar la vista
-        } catch (error) {
-            console.error('Error al eliminar producto:', error);
-        }
-    }
-
-    window.eliminarProducto = eliminarProducto;
-
-    async function agregarProducto(docId) {
-        const nuevoProducto = document.getElementById(`nuevo-producto-${docId}`).value;
-        const nuevaPresentacion = document.getElementById(`nueva-presentacion-${docId}`).value;
-        const nuevaCantidad = document.getElementById(`nueva-cantidad-${docId}`).value;
-
-        if (!nuevoProducto || !nuevaPresentacion || !nuevaCantidad) {
-            alert('Debe completar todos los campos.');
-            return;
-        }
-
-        const pedidoRef = firestoreDoc(db, "pedidos", docId);
-
-        try {
-            const docSnap = await getDoc(pedidoRef);
-            const pedido = docSnap.data();
-            const productoItem = { producto: nuevoProducto, presentacion: nuevaPresentacion, cantidad: nuevaCantidad };
-            const productos = pedido.productos;
-            productos.push(productoItem);
-            await updateDoc(pedidoRef, { productos });
-            revisarPedidoRealizado(docId); // Actualizar la vista
-        } catch (error) {
-            console.error('Error al agregar producto:', error);
-        }
-    }
-
-    window.agregarProducto = agregarProducto;
+    window.mostrarProductosConfirmados = mostrarProductosConfirmados;
 
     async function confirmarPedido(docId) {
         const pedidoRef = firestoreDoc(db, "pedidos", docId);
@@ -226,9 +153,8 @@ document.addEventListener("DOMContentLoaded", function() {
         if (confirm("¿Está seguro de que desea eliminar este pedido?")) {
             try {
                 await deleteDoc(firestoreDoc(db, "pedidos", docId));
-                document.getElementById(`pedido-${docId}`).remove();
                 alert("Pedido eliminado exitosamente.");
-                cargarPedidos();
+                cargarPedidos(); // Actualizar la vista
             } catch (error) {
                 console.error("Error al eliminar pedido:", error);
             }
@@ -245,7 +171,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
             const pedido = docSnap.data();
             let y = 10;
-            pdfDoc.text(`PEDIDO ${pedido.nombre.toUpperCase()}`, 10, y);
+            pdfDoc.text(`PEDIDO ${pedido.sucursal.toUpperCase()}`, 10, y);
             pdfDoc.text(`Fecha: ${pedido.fecha}`, 10, y + 10);
             y += 20;
             pdfDoc.autoTable({
@@ -253,13 +179,80 @@ document.addEventListener("DOMContentLoaded", function() {
                 head: [['PRODUCTO', 'PRESENTACIÓN', 'CANTIDAD']],
                 body: pedido.productos.map(p => [p.producto, p.presentacion, p.cantidad]),
             });
-            pdfDoc.save(`pedido_${pedido.nombre.replace(/\s/g, '_')}.pdf`);
+            pdfDoc.save(`pedido_${docId}.pdf`);
         } catch (error) {
             console.error('Error al exportar pedido a PDF:', error);
         }
     }
 
     window.exportarPedidoPDF = exportarPedidoPDF;
+
+    async function comprobarPedidoRecibidoAdmin(docId) {
+        const productosList = document.getElementById(`productos-list-${docId}`);
+        const productosDiv = document.getElementById(`productos-${docId}`);
+        productosDiv.classList.toggle('hidden');
+
+        if (!productosDiv.classList.contains('hidden')) {
+            try {
+                const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
+                const pedido = docSnap.data();
+                productosList.innerHTML = '';
+                pedido.productos.forEach(producto => {
+                    const productoElement = document.createElement('tr');
+                    productoElement.innerHTML = `
+                        <td>${producto.producto}</td>
+                        <td>${producto.presentacion}</td>
+                        <td>${producto.cantidad}</td>
+                        <td>${producto.cantidadRecibida || ''}</td>
+                        <td>${producto.comentarios || ''}</td>
+                    `;
+                    productosList.appendChild(productoElement);
+                });
+            } catch (error) {
+                console.error('Error al comprobar pedido recibido:', error);
+            }
+        }
+    }
+
+    window.comprobarPedidoRecibidoAdmin = comprobarPedidoRecibidoAdmin;
+
+    async function marcarPedidoCompletado(docId) {
+        const pedidoRef = firestoreDoc(db, "pedidos", docId);
+
+        try {
+            await updateDoc(pedidoRef, { estado: 'completado' });
+            alert('Pedido marcado como completado.');
+            cargarPedidos(); // Actualizar la vista
+        } catch (error) {
+            console.error('Error al marcar pedido como completado:', error);
+        }
+    }
+
+    window.marcarPedidoCompletado = marcarPedidoCompletado;
+
+    async function descargarPedidoRecibido(docId) {
+        const { jsPDF } = window.jspdf;
+        const pdfDoc = new jsPDF();
+
+        try {
+            const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
+            const pedido = docSnap.data();
+            let y = 10;
+            pdfDoc.text(`PEDIDO RECIBIDO ${pedido.sucursal.toUpperCase()}`, 10, y);
+            pdfDoc.text(`Fecha: ${pedido.fecha}`, 10, y + 10);
+            y += 20;
+            pdfDoc.autoTable({
+                startY: y,
+                head: [['PRODUCTO', 'PRESENTACIÓN', 'CANTIDAD', 'CANTIDAD RECIBIDA', 'COMENTARIOS']],
+                body: pedido.productos.map(p => [p.producto, p.presentacion, p.cantidad, p.cantidadRecibida || 'N/A', p.comentarios || '']),
+            });
+            pdfDoc.save(`pedido_recibido_${docId}.pdf`);
+        } catch (error) {
+            console.error('Error al descargar pedido recibido:', error);
+        }
+    }
+
+    window.descargarPedidoRecibido = descargarPedidoRecibido;
 
     cargarPedidos();
 });
