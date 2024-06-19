@@ -127,7 +127,7 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             await updateDoc(pedidoRef, { estado: 'confirmado' });
             alert('Pedido confirmado exitosamente.');
-            cargarPedidos(); // Actualizar la vista
+            location.reload(); // Recargar la página
         } catch (error) {
             console.error('Error al confirmar pedido:', error);
         }
@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             await updateDoc(pedidoRef, { estado: 'completado' });
             alert('Producto verificado y pedido completado.');
-            cargarPedidos(); // Actualizar la vista
+            location.reload(); // Recargar la página
         } catch (error) {
             console.error('Error al verificar producto entregado:', error);
         }
@@ -154,7 +154,7 @@ document.addEventListener("DOMContentLoaded", function() {
             try {
                 await deleteDoc(firestoreDoc(db, "pedidos", docId));
                 alert("Pedido eliminado exitosamente.");
-                cargarPedidos(); // Actualizar la vista
+                location.reload(); // Recargar la página
             } catch (error) {
                 console.error("Error al eliminar pedido:", error);
             }
@@ -222,7 +222,7 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             await updateDoc(pedidoRef, { estado: 'completado' });
             alert('Pedido marcado como completado.');
-            cargarPedidos(); // Actualizar la vista
+            location.reload(); // Recargar la página
         } catch (error) {
             console.error('Error al marcar pedido como completado:', error);
         }

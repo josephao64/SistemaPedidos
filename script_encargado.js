@@ -175,8 +175,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 estado: 'pendiente_confirmacion'
             });
             alert('Pedido enviado exitosamente.');
-            cargarPedidosRealizados(); // Load and display pending orders
-            showMenu('realizarPedido');
+            location.reload(); // Recargar la página
         } catch (error) {
             console.error('Error al enviar pedido:', error);
         }
@@ -352,8 +351,7 @@ document.addEventListener("DOMContentLoaded", function() {
             });
             await updateDoc(pedidoRef, { productos, estado: 'verificado' });
             alert('Datos recibidos guardados exitosamente.');
-            cargarPedidosRealizados(); // Refresh the list
-            document.getElementById(`descargar-recibido-${docId}`).style.display = 'inline-block';
+            location.reload(); // Recargar la página
         } catch (error) {
             console.error('Error al guardar datos recibidos:', error);
         }
