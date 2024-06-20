@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, where, updateDoc, doc as firestoreDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, where, updateDoc, doc as firestoreDoc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-// Your Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyC30cL7JhZPaPyQjIttJmZ8D5cdblBSNhA",
     authDomain: "dbregistrofacturas.firebaseapp.com",
@@ -74,16 +73,32 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.showMenu = showMenu;
 
+    async function getNextPedidoId() {
+        const counterDocRef = firestoreDoc(db, "counters", "pedidos");
+        const counterDocSnap = await getDoc(counterDocRef);
+
+        if (counterDocSnap.exists()) {
+            const currentCount = counterDocSnap.data().count;
+            await updateDoc(counterDocRef, { count: currentCount + 1 });
+            return currentCount + 1;
+        } else {
+            await setDoc(counterDocRef, { count: 1 });
+            return 1;
+        }
+    }
+
     async function registrarPedido(event) {
         event.preventDefault();
 
         const proveedor = document.getElementById('proveedor').value;
         const fechaPedido = new Date().toISOString().split('T')[0];  // Get current date in YYYY-MM-DD format
 
+        const nextPedidoId = await getNextPedidoId();
+
         const nuevoPedido = {
             sucursal,
             proveedor,
-            nombre: '',  // This will be set after the document is created
+            nombre: nextPedidoId.toString(),  // Use the next pedido ID as the name
             fecha: fechaPedido,
             estado: 'pendiente_confirmacion',
             productos: []
@@ -92,9 +107,6 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             const docRef = await addDoc(collection(db, "pedidos"), nuevoPedido);
             currentPedidoId = docRef.id;
-
-            // Update the pedido document with the generated ID as the name
-            await updateDoc(docRef, { nombre: currentPedidoId });
 
             productosPedido = [];
             document.getElementById('pedido-form').reset();
