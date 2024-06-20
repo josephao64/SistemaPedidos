@@ -32,29 +32,15 @@ document.getElementById('encargado-title').innerText += ` - ${sucursal.charAt(0)
 
 const productsByBranch = {
     bodega: [
-        { name: "Harina Trigo Saco 50 lbs", unit: "SACO 50 LIBRAS", category: "Harina" },
-        { name: "Limpia Vidrios", unit: "UNIDAD", category: "Productos de Limpieza" },
-        { name: "Detergente", unit: "UNIDAD", category: "Productos de Limpieza" },
-    ],
-    serpesa: [
-        { name: "Salami Bolsa", unit: "BOLSA", category: "Carnes" },
-    ],
-    super_productos: [
-        { name: "Tomato Pasta", unit: "UNIDAD", category: "Salsas y Condimentos" },
-        { name: "Champiñones", unit: "UNIDAD", category: "Vegetales y Frutas" },
-    ],
-    calder: [
-        { name: "Pizza Cheese Rallado 20 lbs", unit: "LIBRA", category: "Quesos" },
-        { name: "Pizza Cheese Block 5 lbs", unit: "LIBRA", category: "Quesos" },
-    ],
-    carnicos: [
-        { name: "Jamón Tipo Pizza Granel", unit: "LIBRA", category: "Carnes" },
-        { name: "Tocino Rebanado Ahumado", unit: "LIBRA", category: "Carnes" },
-    ],
-    santa_lucia: [
-        { name: "Topping Res de Vacio 5x1", unit: "UNIDAD", category: "Carnes" },
-        { name: "Roastbest", unit: "UNIDAD", category: "Carnes" },
-    ]
+        { name: "Levadura", unit: "Caja", category: "Alimentos" },
+        { name: "Salsa chicharronera", unit: "Bote", category: "Alimentos" },
+        { name: "Piñas", unit: "Unidad", category: "Alimentos" },
+        { name: "Barbacoa", unit: "Libra", category: "Alimentos" },
+        { name: "Queso parmesano", unit: "Bote", category: "Alimentos" },
+        { name: "Polvo rojo", unit: "Bolsa", category: "Alimentos" },
+        { name: "5 quesos", unit: "Bolsa", category: "Alimentos" },
+        { name: "Tomate deshidratado", unit: "Bote", category: "Alimentos" },
+]
 };
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -546,4 +532,28 @@ document.addEventListener("DOMContentLoaded", function() {
 
     cargarPedidosRealizados();
     cargarPedidosRecibidos();
+
+
+
+     // Función para filtrar productos
+ function filtrarProductos() {
+    const searchTerm = document.getElementById('buscarProducto').value.toLowerCase();
+    const productoSelect = document.getElementById('producto');
+    productoSelect.innerHTML = ''; // Clear existing options
+
+    const filteredProductos = productosCargados.filter(producto => 
+        producto.name.toLowerCase().includes(searchTerm)
+    );
+
+    filteredProductos.forEach(producto => {
+        const option = document.createElement('option');
+        option.value = producto.name;
+        option.textContent = producto.name;
+        option.dataset.unit = producto.unit;
+        productoSelect.appendChild(option);
+    });
+}
+
+window.filtrarProductos = filtrarProductos;
+
 });
