@@ -21,6 +21,7 @@
                 <ul class="navbar-nav ml-auto">
                     <li class="nav-item"><a class="nav-link" href="#" onclick="showMenu('realizarPedido')">Realizar Pedido</a></li>
                     <li class="nav-item"><a class="nav-link" href="#" onclick="showMenu('pedidosRealizados')">Pedidos Realizados</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="showMenu('pedidosRecibidos')">Pedidos Recibidos</a></li>
                 </ul>
             </div>
         </div>
@@ -98,7 +99,44 @@
                 </div>
             </div>
         </section>
+        <section id="pedidosRecibidos" class="hidden">
+            <h2 class="mb-4">Pedidos Recibidos</h2>
+            <div id="pedidos-list-recibidos"></div>
+        </section>
     </main>
+
+    <!-- Modal -->
+    <div class="modal fade" id="pedidoModal" tabindex="-1" aria-labelledby="pedidoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="pedidoModalLabel">Comprobar Pedido Recibido</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Presentación</th>
+                                    <th>Cantidad</th>
+                                    <th>Cantidad Recibida</th>
+                                    <th>Comentarios</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modal-productos-list"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="enviar-datos-recibidos">Enviar Datos</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="script_encargado.js"></script>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>

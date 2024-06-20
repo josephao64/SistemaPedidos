@@ -67,6 +67,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
         if (menu === 'pedidosRealizados') {
             cargarPedidosRealizados();
+        } else if (menu === 'pedidosRecibidos') {
+            cargarPedidosRecibidos();
         }
     }
 
@@ -208,31 +210,14 @@ document.addEventListener("DOMContentLoaded", function() {
                         <button class="btn btn-primary" onclick="mostrarProductos('${doc.id}')">Mostrar Pedido</button>
                         <button class="btn btn-success" onclick="descargarPedido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido</button>
                         ${pedido.estado === 'confirmado' ? `
-                            <button class="btn btn-secondary" onclick="comprobarPedidoRecibido('${doc.id}')">Comprobar Pedido Recibido</button>
+                            <button class="btn btn-secondary" onclick="abrirModal('${doc.id}')">Comprobar Pedido Recibido</button>
                             <button class="btn btn-success" id="descargar-recibido-${doc.id}" onclick="descargarPedidoRecibido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido Recibido</button>
                         ` : ''}
-                    </div>
-                    <div id="productos-${doc.id}" class="card-body hidden">
-                        <div class="table-responsive">
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>Producto</th>
-                                        <th>Presentación</th>
-                                        <th>Cantidad</th>
-                                        <th>Cantidad Recibida</th>
-                                        <th>Comentarios</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="productos-list-${doc.id}"></tbody>
-                            </table>
-                        </div>
-                        ${pedido.estado === 'confirmado' ? '<button class="btn btn-primary mt-2" onclick="guardarDatosRecibidos(\'' + doc.id + '\')">Enviar Datos Recibidos</button>' : ''}
                     </div>
                 `;
                 if (pedido.estado === 'pendiente_confirmacion') {
                     pedidosPendientes.appendChild(pedidoElement);
-                } else {
+                } else if (pedido.estado === 'confirmado') {
                     pedidosConfirmados.appendChild(pedidoElement);
                 }
             });
@@ -268,34 +253,39 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.mostrarProductos = mostrarProductos;
 
-    async function comprobarPedidoRecibido(docId) {
-        const productosList = document.getElementById(`productos-list-${docId}`);
-        const productosDiv = document.getElementById(`productos-${docId}`);
-        productosDiv.classList.toggle('hidden');
+    async function abrirModal(docId) {
+        const modal = new bootstrap.Modal(document.getElementById('pedidoModal'));
+        const productosList = document.getElementById('modal-productos-list');
+        productosList.innerHTML = '';
 
-        if (!productosDiv.classList.contains('hidden')) {
-            try {
-                const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
-                const pedido = docSnap.data();
-                productosList.innerHTML = '';
-                pedido.productos.forEach(producto => {
-                    const productoElement = document.createElement('tr');
-                    productoElement.innerHTML = `
-                        <td>${producto.producto}</td>
-                        <td>${producto.presentacion}</td>
-                        <td>${producto.cantidad}</td>
-                        <td><input type="number" value="${producto.cantidadRecibida || ''}" onchange="actualizarCantidadRecibida('${docId}', '${producto.producto}', this.value)"></td>
-                        <td><input type="text" value="${producto.comentarios || ''}" onchange="actualizarComentarios('${docId}', '${producto.producto}', this.value)"></td>
-                    `;
-                    productosList.appendChild(productoElement);
-                });
-            } catch (error) {
-                console.error('Error al comprobar pedido recibido:', error);
-            }
+        try {
+            const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
+            const pedido = docSnap.data();
+            pedido.productos.forEach(producto => {
+                const productoElement = document.createElement('tr');
+                productoElement.innerHTML = `
+                    <td>${producto.producto}</td>
+                    <td>${producto.presentacion}</td>
+                    <td>${producto.cantidad}</td>
+                    <td><input type="number" value="${producto.cantidadRecibida || ''}" onchange="actualizarCantidadRecibida('${docId}', '${producto.producto}', this.value)"></td>
+                    <td><input type="text" value="${producto.comentarios || ''}" onchange="actualizarComentarios('${docId}', '${producto.producto}', this.value)"></td>
+                `;
+                productosList.appendChild(productoElement);
+            });
+
+            const enviarDatosButton = document.getElementById('enviar-datos-recibidos');
+            enviarDatosButton.onclick = function() {
+                guardarDatosRecibidos(docId);
+                modal.hide();
+            };
+
+            modal.show();
+        } catch (error) {
+            console.error('Error al comprobar pedido recibido:', error);
         }
     }
 
-    window.comprobarPedidoRecibido = comprobarPedidoRecibido;
+    window.abrirModal = abrirModal;
 
     async function actualizarCantidadRecibida(docId, producto, cantidadRecibida) {
         const pedidoRef = firestoreDoc(db, "pedidos", docId);
@@ -352,8 +342,8 @@ document.addEventListener("DOMContentLoaded", function() {
             });
             await updateDoc(pedidoRef, { productos, estado: 'verificado' });
             alert('Datos recibidos guardados exitosamente.');
-            // No mover a otro apartado, mantener los botones
-            document.getElementById(`productos-${docId}`).classList.remove('hidden');
+            cargarPedidosRealizados();
+            cargarPedidosRecibidos();
         } catch (error) {
             console.error('Error al guardar datos recibidos:', error);
         }
@@ -421,5 +411,81 @@ document.addEventListener("DOMContentLoaded", function() {
         return doc;
     }
 
+    async function cargarPedidosRecibidos() {
+        const pedidosRecibidos = document.getElementById('pedidos-list-recibidos');
+        pedidosRecibidos.innerHTML = '';
+
+        const q = query(collection(db, "pedidos"), where("sucursal", "==", sucursal), where("estado", "==", "verificado"));
+
+        onSnapshot(q, (snapshot) => {
+            pedidosRecibidos.innerHTML = '';
+
+            snapshot.forEach(doc => {
+                const pedido = doc.data();
+                const pedidoElement = document.createElement('div');
+                pedidoElement.classList.add('card', 'mb-3');
+                pedidoElement.innerHTML = `
+                    <div class="card-header">
+                        <h5 class="card-title">Pedido: ${pedido.sucursal} - ${pedido.proveedor} (${pedido.fecha})</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">Estado: Completado</p>
+                        <button class="btn btn-secondary" onclick="mostrarProductosRecibidos('${doc.id}')">Ver Pedido Recibido</button>
+                        <button class="btn btn-success" onclick="descargarPedidoRecibido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido Recibido</button>
+                    </div>
+                    <div id="productos-recibidos-${doc.id}" class="card-body hidden">
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Presentación</th>
+                                        <th>Cantidad</th>
+                                        <th>Cantidad Recibida</th>
+                                        <th>Comentarios</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productos-list-recibidos-${doc.id}"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                pedidosRecibidos.appendChild(pedidoElement);
+            });
+        });
+    }
+
+    window.cargarPedidosRecibidos = cargarPedidosRecibidos;
+
+    async function mostrarProductosRecibidos(docId) {
+        const productosList = document.getElementById(`productos-list-recibidos-${docId}`);
+        const productosDiv = document.getElementById(`productos-recibidos-${docId}`);
+        productosDiv.classList.toggle('hidden');
+
+        if (!productosDiv.classList.contains('hidden')) {
+            try {
+                const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
+                const pedido = docSnap.data();
+                productosList.innerHTML = '';
+                pedido.productos.forEach(producto => {
+                    const productoElement = document.createElement('tr');
+                    productoElement.innerHTML = `
+                        <td>${producto.producto}</td>
+                        <td>${producto.presentacion}</td>
+                        <td>${producto.cantidad}</td>
+                        <td>${producto.cantidadRecibida || ''}</td>
+                        <td>${producto.comentarios || ''}</td>
+                    `;
+                    productosList.appendChild(productoElement);
+                });
+            } catch (error) {
+                console.error('Error al mostrar productos recibidos:', error);
+            }
+        }
+    }
+
+    window.mostrarProductosRecibidos = mostrarProductosRecibidos;
+
     cargarPedidosRealizados();
+    cargarPedidosRecibidos();
 });
