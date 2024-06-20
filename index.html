@@ -1,4 +1,4 @@
-}<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -41,6 +41,7 @@
         </div>
     </div>
     <script>
+        // Mostrar/Ocultar el campo de sucursal dependiendo del rol seleccionado
         document.getElementById('role').addEventListener('change', function() {
             const role = this.value;
             const sucursalGroup = document.getElementById('sucursal-group');
@@ -51,12 +52,14 @@
             }
         });
 
+        // Manejar el envío del formulario de login
         document.getElementById('login-form').addEventListener('submit', function(event) {
             event.preventDefault();
             const role = document.getElementById('role').value;
             const sucursal = document.getElementById('sucursal').value;
             const password = document.getElementById('password').value;
 
+            // Credenciales predefinidas
             const credentials = {
                 administracion: '0',
                 encargado: {
@@ -85,7 +88,7 @@
             }
         });
 
-        // Set default role to 'encargado' and show the sucursal selection
+        // Configuración predeterminada del formulario
         document.getElementById('role').value = 'encargado';
         document.getElementById('sucursal-group').style.display = 'block';
     </script>

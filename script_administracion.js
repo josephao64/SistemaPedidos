@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     productoElement.innerHTML = `
                         <td>${producto.producto}</td>
                         <td>${producto.presentacion}</td>
-                        <td><input type="number" value="${producto.cantidad}" onchange="actualizarCantidad('${docId}', '${index}', this.value)"></td>
+                        <td><input type="number" value="${producto.cantidad}" onchange="actualizarCantidad('${doc.id}', '${index}', this.value)"></td>
                         <td>${producto.cantidadRecibida || ''}</td>
                         <td>${producto.comentarios || ''}</td>
                     `;

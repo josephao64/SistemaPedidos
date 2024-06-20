@@ -352,7 +352,8 @@ document.addEventListener("DOMContentLoaded", function() {
             });
             await updateDoc(pedidoRef, { productos, estado: 'verificado' });
             alert('Datos recibidos guardados exitosamente.');
-            cargarPedidosRealizados(); // Refresh the list
+            // No mover a otro apartado, mantener los botones
+            document.getElementById(`productos-${docId}`).classList.remove('hidden');
         } catch (error) {
             console.error('Error al guardar datos recibidos:', error);
         }
