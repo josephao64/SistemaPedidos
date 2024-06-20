@@ -42,10 +42,6 @@
                         <option value="santa_lucia">Santa Lucia</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="fecha_pedido">Fecha del Pedido:</label>
-                    <input type="date" id="fecha_pedido" class="form-control" required>
-                </div>
                 <button type="submit" class="btn btn-primary">Registrar Pedido</button>
             </form>
         </section>
@@ -85,6 +81,7 @@
                 </table>
             </div>
             <button class="btn btn-primary mt-4" onclick="enviarPedido()">Enviar Pedido</button>
+            <button type="button" class="btn btn-danger mt-4" onclick="cancelarPedido()">Cancelar Pedido</button>
         </section>
         <section id="pedidosRealizados" class="hidden">
             <h2 class="mb-4">Pedidos Realizados</h2>

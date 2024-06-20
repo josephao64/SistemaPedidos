@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, where, updateDoc, doc as firestoreDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, where, updateDoc, doc as firestoreDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -78,13 +78,24 @@ document.addEventListener("DOMContentLoaded", function() {
         event.preventDefault();
 
         const proveedor = document.getElementById('proveedor').value;
-        const fechaPedido = document.getElementById('fecha_pedido').value;
+        const fechaPedido = new Date().toISOString().split('T')[0];  // Get current date in YYYY-MM-DD format
 
-        const nuevoPedido = { sucursal, proveedor, fecha: fechaPedido, estado: 'pendiente_confirmacion', productos: [] };
-        
+        const nuevoPedido = {
+            sucursal,
+            proveedor,
+            nombre: '',  // This will be set after the document is created
+            fecha: fechaPedido,
+            estado: 'pendiente_confirmacion',
+            productos: []
+        };
+
         try {
             const docRef = await addDoc(collection(db, "pedidos"), nuevoPedido);
             currentPedidoId = docRef.id;
+
+            // Update the pedido document with the generated ID as the name
+            await updateDoc(docRef, { nombre: currentPedidoId });
+
             productosPedido = [];
             document.getElementById('pedido-form').reset();
             alert('Pedido registrado exitosamente.');
@@ -185,6 +196,21 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.enviarPedido = enviarPedido;
 
+    async function cancelarPedido() {
+        if (currentPedidoId) {
+            const pedidoRef = firestoreDoc(db, "pedidos", currentPedidoId);
+            try {
+                await deleteDoc(pedidoRef);
+                alert('Pedido cancelado exitosamente.');
+                showMenu('realizarPedido');
+            } catch (error) {
+                console.error('Error al cancelar pedido:', error);
+            }
+        }
+    }
+
+    window.cancelarPedido = cancelarPedido;
+
     async function cargarPedidosRealizados() {
         const pedidosConfirmados = document.getElementById('pedidos-confirmados');
         const pedidosPendientes = document.getElementById('pedidos-pendientes');
@@ -203,7 +229,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 pedidoElement.classList.add('card', 'mb-3');
                 pedidoElement.innerHTML = `
                     <div class="card-header">
-                        <h5 class="card-title">Pedido: ${pedido.sucursal} - ${pedido.proveedor} (${pedido.fecha})</h5>
+                        <h5 class="card-title">Pedido: ${pedido.nombre} (${pedido.proveedor} - ${pedido.fecha})</h5>
                     </div>
                     <div class="card-body">
                         <p class="card-text">Estado: ${pedido.estado === 'pendiente_confirmacion' ? 'Pendiente de Confirmación' : 'Confirmado'}</p>
@@ -213,6 +239,22 @@ document.addEventListener("DOMContentLoaded", function() {
                             <button class="btn btn-secondary" onclick="abrirModal('${doc.id}')">Comprobar Pedido Recibido</button>
                             <button class="btn btn-success" id="descargar-recibido-${doc.id}" onclick="descargarPedidoRecibido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido Recibido</button>
                         ` : ''}
+                    </div>
+                    <div id="productos-${doc.id}" class="card-body hidden">
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Presentación</th>
+                                        <th>Cantidad</th>
+                                        <th>Cantidad Recibida</th>
+                                        <th>Comentarios</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productos-list-${doc.id}"></tbody>
+                            </table>
+                        </div>
                     </div>
                 `;
                 if (pedido.estado === 'pendiente_confirmacion') {
@@ -229,25 +271,29 @@ document.addEventListener("DOMContentLoaded", function() {
     async function mostrarProductos(docId) {
         const productosList = document.getElementById(`productos-list-${docId}`);
         const productosDiv = document.getElementById(`productos-${docId}`);
-        productosDiv.classList.toggle('hidden');
-
-        if (!productosDiv.classList.contains('hidden')) {
-            try {
-                const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
-                const pedido = docSnap.data();
-                productosList.innerHTML = '';
-                pedido.productos.forEach(producto => {
-                    const productoElement = document.createElement('tr');
-                    productoElement.innerHTML = `
-                        <td>${producto.producto}</td>
-                        <td>${producto.presentacion}</td>
-                        <td>${producto.cantidad}</td>
-                    `;
-                    productosList.appendChild(productoElement);
-                });
-            } catch (error) {
-                console.error('Error al mostrar productos:', error);
+        if (productosDiv && productosList) {
+            productosDiv.classList.toggle('hidden');
+    
+            if (!productosDiv.classList.contains('hidden')) {
+                try {
+                    const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
+                    const pedido = docSnap.data();
+                    productosList.innerHTML = '';
+                    pedido.productos.forEach(producto => {
+                        const productoElement = document.createElement('tr');
+                        productoElement.innerHTML = `
+                            <td>${producto.producto}</td>
+                            <td>${producto.presentacion}</td>
+                            <td>${producto.cantidad}</td>
+                        `;
+                        productosList.appendChild(productoElement);
+                    });
+                } catch (error) {
+                    console.error('Error al mostrar productos:', error);
+                }
             }
+        } else {
+            console.error('Error: Element not found for docId', docId);
         }
     }
 
@@ -426,7 +472,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 pedidoElement.classList.add('card', 'mb-3');
                 pedidoElement.innerHTML = `
                     <div class="card-header">
-                        <h5 class="card-title">Pedido: ${pedido.sucursal} - ${pedido.proveedor} (${pedido.fecha})</h5>
+                        <h5 class="card-title">Pedido: ${pedido.nombre} (${pedido.proveedor} - ${pedido.fecha})</h5>
                     </div>
                     <div class="card-body">
                         <p class="card-text">Estado: Completado</p>
