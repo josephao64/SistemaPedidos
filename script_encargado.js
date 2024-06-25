@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, where, updateDoc, doc as firestoreDoc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy, updateDoc, doc as firestoreDoc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC30cL7JhZPaPyQjIttJmZ8D5cdblBSNhA",
@@ -16,6 +16,7 @@ const db = getFirestore(app);
 
 let currentPedidoId = null;
 let productosPedido = [];
+let productosCargados = [];
 
 // Function to get URL parameters
 function getQueryParams() {
@@ -27,8 +28,16 @@ function getQueryParams() {
 
 // Set the sucursal from the URL
 const { sucursal } = getQueryParams();
-document.getElementById('sucursal').value = sucursal;
-document.getElementById('encargado-title').innerText += ` - ${sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}`;
+if (sucursal) {
+    const sucursalInput = document.getElementById('sucursal');
+    if (sucursalInput) {
+        sucursalInput.value = sucursal;
+    }
+    const encargadoTitle = document.getElementById('encargado-title');
+    if (encargadoTitle) {
+        encargadoTitle.innerText += ` - ${sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}`;
+    }
+}
 
 const productsByBranch = {
     bodega: [
@@ -40,7 +49,7 @@ const productsByBranch = {
         { name: "Polvo rojo", unit: "Bolsa", category: "Alimentos" },
         { name: "5 quesos", unit: "Bolsa", category: "Alimentos" },
         { name: "Tomate deshidratado", unit: "Bote", category: "Alimentos" },
-]
+    ]
 };
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -96,9 +105,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
             productosPedido = [];
             document.getElementById('pedido-form').reset();
+            document.getElementById('productos-list').innerHTML = '';
             alert('Pedido registrado exitosamente.');
             cargarProductos(proveedor);
             showMenu('productosPedido');
+            cargarPedidosRealizados(); // Llamar a cargar pedidos realizados para actualizar la lista
         } catch (error) {
             console.error('Error al registrar pedido:', error);
         }
@@ -108,8 +119,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function cargarProductos(proveedor) {
         const productoSelect = document.getElementById('producto');
-        productoSelect.innerHTML = '';
         const productos = productsByBranch[proveedor] || [];
+        productosCargados = productos;  // Guardar productos cargados
+        productoSelect.innerHTML = '';
         productos.forEach(producto => {
             const option = document.createElement('option');
             option.value = producto.name;
@@ -125,6 +137,15 @@ document.addEventListener("DOMContentLoaded", function() {
                 document.getElementById('stock').value = ''; // Clear stock value
             }
         });
+
+        // Ensure the presentation field is updated initially
+        if (productoSelect.value) {
+            const selectedProduct = productos.find(p => p.name === productoSelect.value);
+            if (selectedProduct) {
+                document.getElementById('presentacion').value = selectedProduct.unit;
+                document.getElementById('stock').value = ''; // Clear stock value
+            }
+        }
     }
 
     async function agregarProducto(event) {
@@ -145,6 +166,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
         actualizarListaProductos();
         document.getElementById('producto-form').reset();
+
+        // Reiniciar el buscador
+        document.getElementById('buscarProducto').value = '';
+        cargarProductos(document.getElementById('proveedor').value);
     }
 
     window.agregarProducto = agregarProducto;
@@ -187,6 +212,7 @@ document.addEventListener("DOMContentLoaded", function() {
             });
             alert('Pedido enviado exitosamente.');
             showMenu('realizarPedido');
+            cargarPedidosRealizados(); // Llamar a cargar pedidos realizados para actualizar la lista
         } catch (error) {
             console.error('Error al enviar pedido:', error);
         }
@@ -215,7 +241,7 @@ document.addEventListener("DOMContentLoaded", function() {
         pedidosConfirmados.innerHTML = '';
         pedidosPendientes.innerHTML = '';
 
-        const q = query(collection(db, "pedidos"), where("sucursal", "==", sucursal));
+        const q = query(collection(db, "pedidos"), where("sucursal", "==", sucursal), orderBy("fecha", "desc"));
 
         onSnapshot(q, (snapshot) => {
             pedidosConfirmados.innerHTML = '';
@@ -232,10 +258,9 @@ document.addEventListener("DOMContentLoaded", function() {
                     <div class="card-body">
                         <p class="card-text">Estado: ${pedido.estado === 'pendiente_confirmacion' ? 'Pendiente de Confirmación' : 'Confirmado'}</p>
                         <button class="btn btn-primary" onclick="mostrarProductos('${doc.id}')">Mostrar Pedido</button>
-                        <button class="btn btn-success" onclick="descargarPedido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido</button>
+                        <button class="btn btn-success" onclick="confirmarPedido('${doc.id}')">Confirmar Pedido</button>
                         ${pedido.estado === 'confirmado' ? `
-                            <button class="btn btn-secondary" onclick="abrirModal('${doc.id}')">Comprobar Pedido Recibido</button>
-                            <button class="btn btn-success" id="descargar-recibido-${doc.id}" onclick="descargarPedidoRecibido('${doc.id}', '${pedido.sucursal}', '${pedido.fecha}', '${pedido.proveedor}')">Descargar Pedido Recibido</button>
+                            <button class="btn btn-secondary" onclick="abrirModal('${doc.id}')">Comprobar Pedido</button>
                         ` : ''}
                     </div>
                     <div id="productos-${doc.id}" class="card-body hidden">
@@ -246,8 +271,6 @@ document.addEventListener("DOMContentLoaded", function() {
                                         <th>Producto</th>
                                         <th>Presentación</th>
                                         <th>Cantidad</th>
-                                        <th>Cantidad Recibida</th>
-                                        <th>Comentarios</th>
                                     </tr>
                                 </thead>
                                 <tbody id="productos-list-${doc.id}"></tbody>
@@ -297,11 +320,25 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.mostrarProductos = mostrarProductos;
 
+    async function confirmarPedido(docId) {
+        const pedidoRef = firestoreDoc(db, "pedidos", docId);
+
+        try {
+            await updateDoc(pedidoRef, { estado: 'confirmado' });
+            alert('Pedido confirmado exitosamente.');
+            cargarPedidosRealizados(); // Llamar a cargar pedidos realizados para actualizar la lista
+        } catch (error) {
+            console.error('Error al confirmar pedido:', error);
+        }
+    }
+
+    window.confirmarPedido = confirmarPedido;
+
     async function abrirModal(docId) {
         const modal = new bootstrap.Modal(document.getElementById('pedidoModal'));
         const productosList = document.getElementById('modal-productos-list');
         productosList.innerHTML = '';
-
+    
         try {
             const docSnap = await getDoc(firestoreDoc(db, "pedidos", docId));
             const pedido = docSnap.data();
@@ -316,19 +353,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 `;
                 productosList.appendChild(productoElement);
             });
-
+    
             const enviarDatosButton = document.getElementById('enviar-datos-recibidos');
             enviarDatosButton.onclick = function() {
                 guardarDatosRecibidos(docId);
                 modal.hide();
             };
-
+    
             modal.show();
         } catch (error) {
             console.error('Error al comprobar pedido recibido:', error);
         }
     }
-
+    
     window.abrirModal = abrirModal;
 
     async function actualizarCantidadRecibida(docId, producto, cantidadRecibida) {
@@ -459,7 +496,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const pedidosRecibidos = document.getElementById('pedidos-list-recibidos');
         pedidosRecibidos.innerHTML = '';
 
-        const q = query(collection(db, "pedidos"), where("sucursal", "==", sucursal), where("estado", "==", "verificado"));
+        const q = query(collection(db, "pedidos"), where("sucursal", "==", sucursal), where("estado", "==", "verificado"), orderBy("fecha", "desc"));
 
         onSnapshot(q, (snapshot) => {
             pedidosRecibidos.innerHTML = '';
@@ -533,27 +570,41 @@ document.addEventListener("DOMContentLoaded", function() {
     cargarPedidosRealizados();
     cargarPedidosRecibidos();
 
+    // Función para filtrar productos
+    function filtrarProductos() {
+        const searchTerm = document.getElementById('buscarProducto').value.toLowerCase();
+        const productoSelect = document.getElementById('producto');
+        productoSelect.innerHTML = ''; // Clear existing options
 
+        const filteredProductos = productosCargados.filter(producto => 
+            producto.name.toLowerCase().includes(searchTerm)
+        );
 
-     // Función para filtrar productos
- function filtrarProductos() {
-    const searchTerm = document.getElementById('buscarProducto').value.toLowerCase();
-    const productoSelect = document.getElementById('producto');
-    productoSelect.innerHTML = ''; // Clear existing options
+        filteredProductos.forEach(producto => {
+            const option = document.createElement('option');
+            option.value = producto.name;
+            option.textContent = producto.name;
+            option.dataset.unit = producto.unit;
+            productoSelect.appendChild(option);
+        });
 
-    const filteredProductos = productosCargados.filter(producto => 
-        producto.name.toLowerCase().includes(searchTerm)
-    );
+        // Ensure the presentation field is updated
+        if (productoSelect.value) {
+            const selectedProduct = filteredProductos.find(p => p.name === productoSelect.value);
+            if (selectedProduct) {
+                document.getElementById('presentacion').value = selectedProduct.unit;
+                document.getElementById('stock').value = ''; // Clear stock value
+            }
+        }
+    }
 
-    filteredProductos.forEach(producto => {
-        const option = document.createElement('option');
-        option.value = producto.name;
-        option.textContent = producto.name;
-        option.dataset.unit = producto.unit;
-        productoSelect.appendChild(option);
+    window.filtrarProductos = filtrarProductos;
+
+    // Añadir llamada a cargarProductos cuando se seleccione un proveedor
+    document.getElementById('proveedor').addEventListener('change', function() {
+        cargarProductos(this.value);
     });
-}
 
-window.filtrarProductos = filtrarProductos;
-
+    // Llamada inicial para cargar productos del proveedor por defecto
+    cargarProductos(document.getElementById('proveedor').value);
 });
